@@ -4,6 +4,7 @@ const STORAGE_KEY = 'staffsync_demo_sops_v1'
 const EVENT_NAME = 'staffsync-demo-sops-updated'
 const DEFAULT_VIDEO_URL =
   'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+const DEFAULT_POSTER_URL = '/sop-posters/default.svg'
 
 export const loadDemoSops = () => {
   if (typeof window === 'undefined') return seedSops
@@ -25,8 +26,8 @@ export const loadDemoSops = () => {
       return {
         ...seed,
         ...item,
-        poster: item.poster ?? seed.poster,
-        duration: item.duration ?? seed.duration,
+        poster: item.poster ?? seed.poster ?? DEFAULT_POSTER_URL,
+        duration: item.duration ?? seed.duration ?? '—',
         video: keepItemVideo ? item.video : seed.video,
       }
     })

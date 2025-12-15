@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ProblemReportModal from '../../components/shared/ProblemReportModal'
 import RequestGuideModal from '../../components/shared/RequestGuideModal'
+import VideoThumbnail from '../../components/shared/VideoThumbnail'
 import { loadDemoSops, subscribeDemoSops } from '../../lib/demoStore'
 import { addDemoRequest } from '../../lib/demoRequestsStore'
 
@@ -114,24 +115,17 @@ const StaffHome = () => {
             className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="relative overflow-hidden rounded-xl border border-slate-100 bg-slate-100 dark:border-slate-800 dark:bg-slate-800/80">
+              <VideoThumbnail
+                src={record.video?.url || ''}
+                fallbackSrc={record.poster || '/sop-posters/default.svg'}
+                alt={record.taskName}
+                className="h-52 w-full object-cover"
+              />
               {record.video?.url ? (
-                <>
-                  <video
-                    src={record.video.url}
-                    poster={record.poster}
-                    muted
-                    playsInline
-                    autoPlay
-                    loop
-                    preload="metadata"
-                    className="h-52 w-full object-cover"
-                  />
-                </>
-              ) : (
-                <div className="flex h-52 items-center justify-center text-base font-semibold text-slate-500 dark:text-slate-300">
-                  No video
-                </div>
-              )}
+                <span className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/70 text-sm font-semibold text-white backdrop-blur dark:bg-slate-900/70">
+                  ▶
+                </span>
+              ) : null}
             </div>
 
             <div className="space-y-1">

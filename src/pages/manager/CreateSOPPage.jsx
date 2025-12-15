@@ -6,11 +6,20 @@ import { updateDemoRequest } from '../../lib/demoRequestsStore'
 
 const categories = ['Front Desk', 'Housekeeping', 'Food & Beverage', 'Maintenance', 'Safety', 'Other']
 
+const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '—'
+  const total = Math.round(seconds)
+  const mins = Math.floor(total / 60)
+  const secs = total % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
 const CreateSOPPage = () => {
   const [searchParams] = useSearchParams()
   const [taskName, setTaskName] = useState('')
   const [category, setCategory] = useState(categories[0])
   const [videoFile, setVideoFile] = useState(null)
+  const [videoDuration, setVideoDuration] = useState('—')
   const [status, setStatus] = useState('idle') // idle | uploading | creating | processing | ready | error
   const [error, setError] = useState('')
 
@@ -18,6 +27,40 @@ const CreateSOPPage = () => {
     const title = searchParams.get('title')
     if (title && !taskName) setTaskName(title)
   }, [searchParams, taskName])
+
+  useEffect(() => {
+    if (!videoFile) {
+      setVideoDuration('—')
+      return
+    }
+
+    let canceled = false
+    const url = URL.createObjectURL(videoFile)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.src = url
+
+    const onLoaded = () => {
+      if (canceled) return
+      setVideoDuration(formatDuration(video.duration))
+      URL.revokeObjectURL(url)
+    }
+    const onError = () => {
+      if (canceled) return
+      setVideoDuration('—')
+      URL.revokeObjectURL(url)
+    }
+
+    video.addEventListener('loadedmetadata', onLoaded)
+    video.addEventListener('error', onError)
+
+    return () => {
+      canceled = true
+      video.removeEventListener('loadedmetadata', onLoaded)
+      video.removeEventListener('error', onError)
+      URL.revokeObjectURL(url)
+    }
+  }, [videoFile])
 
   const isBusy = useMemo(() => status !== 'idle' && status !== 'ready' && status !== 'error', [status])
 
@@ -41,6 +84,8 @@ const CreateSOPPage = () => {
             id,
             taskName: taskName.trim(),
             category,
+            duration: videoDuration,
+            poster: '/sop-posters/default.svg',
             video: { url },
             steps: {
               en: 'Demo steps will appear here.\n(Connect Airtable to enable AI steps)',
@@ -134,6 +179,11 @@ const CreateSOPPage = () => {
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               Upload from your phone or laptop. File is saved directly to Airtable.
             </p>
+            {videoFile ? (
+              <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Duration: {videoDuration}
+              </p>
+            ) : null}
           </div>
         </div>
 
