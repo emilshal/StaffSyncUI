@@ -223,7 +223,10 @@ const AccountMenu = () => {
           <button
             type="button"
             role="menuitem"
-            onClick={() => navigate('/login')}
+            onClick={() => {
+              clearDemoSession()
+              navigate('/login', { replace: true })
+            }}
             className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             <span>Switch account</span>

@@ -1,5 +1,18 @@
-const ConfirmDialog = ({ open, title, message, confirmText = 'Confirm', onCancel, onConfirm }) => {
+const ConfirmDialog = ({
+  open,
+  title,
+  message,
+  confirmText = 'Confirm',
+  confirmTone = 'danger', // danger | success
+  onCancel,
+  onConfirm,
+}) => {
   if (!open) return null
+
+  const confirmClassName =
+    confirmTone === 'success'
+      ? 'bg-emerald-600 hover:bg-emerald-700'
+      : 'bg-red-600 hover:bg-red-700'
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/60 p-4 sm:items-center">
@@ -9,7 +22,7 @@ const ConfirmDialog = ({ open, title, message, confirmText = 'Confirm', onCancel
         <div className="mt-4 flex gap-2">
           <button
             onClick={onConfirm}
-            className="flex-1 rounded-full bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg"
+            className={`flex-1 rounded-full px-4 py-3 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg ${confirmClassName}`}
           >
             {confirmText}
           </button>
@@ -26,4 +39,3 @@ const ConfirmDialog = ({ open, title, message, confirmText = 'Confirm', onCancel
 }
 
 export default ConfirmDialog
-
