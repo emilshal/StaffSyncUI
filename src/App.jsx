@@ -176,12 +176,31 @@ const AccountMenu = () => {
     setOpen(false)
   }, [location.pathname])
 
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-account-menu-root]')) return
+      setOpen(false)
+    }
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
   if (!loggedIn) return null
 
   const label = user?.name ? user.name.split(' ')[0] : 'Account'
 
   return (
-    <div className="relative">
+    <div className="relative" data-account-menu-root>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
