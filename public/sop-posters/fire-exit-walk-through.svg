@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ef4444"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(255,255,255,0.22)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0.08)"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <circle cx="240" cy="560" r="240" fill="rgba(255,255,255,0.10)"/>
+  <circle cx="1030" cy="150" r="180" fill="rgba(255,255,255,0.12)"/>
+  <rect x="70" y="70" width="1060" height="535" rx="42" fill="rgba(15,23,42,0.28)" stroke="rgba(255,255,255,0.28)" stroke-width="2"/>
+  <rect x="110" y="120" width="980" height="140" rx="28" fill="url(#glass)"/>
+  <text x="150" y="190" font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" font-size="48" font-weight="700" fill="#ffffff">Fire exit walk-through</text>
+  <text x="150" y="242" font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" font-size="22" font-weight="600" fill="rgba(255,255,255,0.85)">Safety • 0:55</text>
+  <g transform="translate(1020,160)">
+    <rect x="-54" y="-54" width="108" height="108" rx="28" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+    <path d="M-10 -26h20v52h-20z" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M-26 6h24" stroke="rgba(255,255,255,0.95)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M-4 6l-10-10M-4 6l-10 10" stroke="rgba(255,255,255,0.95)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
