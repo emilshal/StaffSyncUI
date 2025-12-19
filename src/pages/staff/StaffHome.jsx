@@ -5,13 +5,15 @@ import RequestGuideModal from '../../components/shared/RequestGuideModal'
 import VideoThumbnail from '../../components/shared/VideoThumbnail'
 import { loadDemoSops, subscribeDemoSops } from '../../lib/demoStore'
 import { addDemoRequest } from '../../lib/demoRequestsStore'
+import { createProblemReport, uploadAttachment } from '../../lib/airtable'
 
 const StaffHome = () => {
   const [sops, setSops] = useState(loadDemoSops)
   const [showProblemModal, setShowProblemModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [submittingProblem, setSubmittingProblem] = useState(false)
   const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('All')
+  const [selectedCategories, setSelectedCategories] = useState([])
   const [toast, setToast] = useState('')
 
   useEffect(() => {
@@ -22,21 +24,21 @@ const StaffHome = () => {
   const categories = useMemo(() => {
     const set = new Set()
     sops.forEach((sop) => set.add(sop.category || 'Uncategorized'))
-    return ['All', ...Array.from(set).sort()]
+    return Array.from(set).sort()
   }, [sops])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return sops.filter((sop) => {
-      const matchesCategory =
-        activeCategory === 'All' || (sop.category || 'Uncategorized') === activeCategory
+      const sopCategory = sop.category || 'Uncategorized'
+      const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(sopCategory)
       const matchesQuery =
         !q ||
         (sop.taskName || '').toLowerCase().includes(q) ||
         (sop.category || '').toLowerCase().includes(q)
       return matchesCategory && matchesQuery
     })
-  }, [sops, query, activeCategory])
+  }, [sops, query, selectedCategories])
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours()
@@ -70,13 +72,29 @@ const StaffHome = () => {
         </div>
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 hide-scrollbar">
+          <button
+            type="button"
+            onClick={() => setSelectedCategories([])}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-base font-semibold transition ${
+              selectedCategories.length
+                ? 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'
+                : 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'
+            }`}
+          >
+            {selectedCategories.length ? 'Clear' : 'All'}
+          </button>
           {categories.map((cat) => {
-            const selected = cat === activeCategory
+            const selected = selectedCategories.includes(cat)
             return (
               <button
                 key={cat}
                 type="button"
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => {
+                  setSelectedCategories((prev) => {
+                    if (prev.includes(cat)) return prev.filter((c) => c !== cat)
+                    return [...prev, cat]
+                  })
+                }}
                 className={`whitespace-nowrap rounded-full px-4 py-2 text-base font-semibold transition ${
                   selected
                     ? 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'
@@ -145,18 +163,50 @@ const StaffHome = () => {
       <ProblemReportModal
         open={showProblemModal}
         onClose={() => setShowProblemModal(false)}
-        onSubmit={() => {}}
-        submitting={false}
+        submitting={submittingProblem}
+        onSubmit={async ({ note, category, locationName, media, reset }) => {
+          setSubmittingProblem(true)
+          try {
+            if (import.meta.env.VITE_AIRTABLE_API_KEY && import.meta.env.VITE_AIRTABLE_BASE_ID) {
+              const attachment = media ? await uploadAttachment(media) : null
+              await createProblemReport({
+                mediaAttachmentId: attachment?.id || '',
+                note,
+                category,
+                locationName,
+              })
+            }
+
+            addDemoRequest({
+              kind: 'problem',
+              categoryHint: category || '',
+              text: note?.trim() ? note.trim() : 'Problem report',
+              message: note?.trim() ? note.trim() : '',
+              locationName: locationName || '',
+              mediaName: media?.name || '',
+            })
+
+            reset?.()
+            setShowProblemModal(false)
+            setToast('Report sent')
+            setTimeout(() => setToast(''), 2500)
+          } catch {
+            setToast('Could not send report')
+            setTimeout(() => setToast(''), 2500)
+          } finally {
+            setSubmittingProblem(false)
+          }
+        }}
       />
 
       <RequestGuideModal
         open={showRequestModal}
         onClose={() => setShowRequestModal(false)}
-        categoryHint={activeCategory === 'All' ? '' : activeCategory}
+        categoryHint={selectedCategories.length === 1 ? selectedCategories[0] : ''}
         onSend={(text) => {
           addDemoRequest({
             text,
-            categoryHint: activeCategory === 'All' ? '' : activeCategory,
+            categoryHint: selectedCategories.length === 1 ? selectedCategories[0] : '',
           })
           setShowRequestModal(false)
           setToast('Request sent')

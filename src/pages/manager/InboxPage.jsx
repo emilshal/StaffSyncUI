@@ -40,7 +40,35 @@ const InboxPage = () => {
               key={req.id}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-800 dark:bg-slate-900"
             >
-              {req.kind === 'feedback' ? (
+              {req.kind === 'problem' ? (
+                <div className="block">
+                  <p className="text-base font-semibold text-slate-900 dark:text-slate-50">Problem reported</p>
+                  {req.message ? (
+                    <p className="mt-2 text-base text-slate-600 dark:text-slate-300">{req.message}</p>
+                  ) : null}
+                  {req.locationName ? (
+                    <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-300">
+                      Location: {req.locationName}
+                    </p>
+                  ) : null}
+                  {req.mediaName ? (
+                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
+                      Media: {req.mediaName}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-300">
+                    <span>{new Date(req.createdAt).toLocaleString()}</span>
+                    {req.categoryHint ? (
+                      <>
+                        <span className="text-xs">•</span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          {req.categoryHint}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ) : req.kind === 'feedback' ? (
                 <Link to={req.sopId ? `/manager/sop/${req.sopId}` : '/manager'} className="block">
                   <p className="text-base font-semibold text-slate-900 dark:text-slate-50">
                     Issue reported: {req.sopTitle || 'SOP'}

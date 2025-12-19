@@ -11,7 +11,7 @@ const ManagerHome = () => {
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('All')
+  const [selectedCategories, setSelectedCategories] = useState([])
   const [requests, setRequests] = useState(loadDemoRequests)
 
   useEffect(() => {
@@ -27,7 +27,7 @@ const ManagerHome = () => {
   const categories = useMemo(() => {
     const set = new Set()
     sops.forEach((sop) => set.add(sop.category || 'Uncategorized'))
-    return ['All', ...Array.from(set).sort()]
+    return Array.from(set).sort()
   }, [sops])
 
   const openRequests = useMemo(
@@ -38,15 +38,15 @@ const ManagerHome = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return sops.filter((sop) => {
-      const matchesCategory =
-        activeCategory === 'All' || (sop.category || 'Uncategorized') === activeCategory
+      const sopCategory = sop.category || 'Uncategorized'
+      const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(sopCategory)
       const matchesQuery =
         !q ||
         (sop.taskName || '').toLowerCase().includes(q) ||
         (sop.category || '').toLowerCase().includes(q)
       return matchesCategory && matchesQuery
     })
-  }, [sops, query, activeCategory])
+  }, [sops, query, selectedCategories])
 
   const handleSave = (updated) => {
     const next = sops.map((item) => (item.id === updated.id ? updated : item))
@@ -140,13 +140,29 @@ const ManagerHome = () => {
         </div>
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 hide-scrollbar">
+          <button
+            type="button"
+            onClick={() => setSelectedCategories([])}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-base font-semibold transition ${
+              selectedCategories.length
+                ? 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'
+                : 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'
+            }`}
+          >
+            {selectedCategories.length ? 'Clear' : 'All'}
+          </button>
           {categories.map((cat) => {
-            const selected = cat === activeCategory
+            const selected = selectedCategories.includes(cat)
             return (
               <button
                 key={cat}
                 type="button"
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => {
+                  setSelectedCategories((prev) => {
+                    if (prev.includes(cat)) return prev.filter((c) => c !== cat)
+                    return [...prev, cat]
+                  })
+                }}
                 className={`whitespace-nowrap rounded-full px-4 py-2 text-base font-semibold transition ${
                   selected
                     ? 'border border-sky-200 bg-sky-100 text-sky-900 shadow-card dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-200'

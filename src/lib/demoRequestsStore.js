@@ -39,10 +39,12 @@ export const subscribeDemoRequests = (callback) => {
 export const addDemoRequest = ({
   text,
   categoryHint = '',
-  kind = 'guide', // guide | feedback
+  kind = 'guide', // guide | feedback | problem
   sopId = '',
   sopTitle = '',
   message = '',
+  locationName = '',
+  mediaName = '',
 } = {}) => {
   const requests = loadDemoRequests()
   const next = [
@@ -54,6 +56,8 @@ export const addDemoRequest = ({
       sopId,
       sopTitle,
       message,
+      locationName,
+      mediaName,
       status: 'open', // open | done
       createdAt: new Date().toISOString(),
     },
