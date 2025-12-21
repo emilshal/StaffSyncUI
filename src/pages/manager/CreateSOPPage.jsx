@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { createSOP, ensureQrLinkOnRecord, pollSOPForSteps, uploadAttachment } from '../../lib/airtable'
 import { loadDemoSops, saveDemoSops } from '../../lib/demoStore'
 import { updateDemoRequest } from '../../lib/demoRequestsStore'
+import { ACTION_TYPES } from '../../lib/events/eventContract'
+import { sendEventToMake } from '../../lib/api/makeWebhook'
+import { uploadMediaToCloudinary } from '../../lib/uploads/cloudinary'
+import { debugLog, debugWarn } from '../../lib/debug'
+import { useVideoRecorder } from '../../lib/recording/useVideoRecorder'
 
 const categories = ['Front Desk', 'Housekeeping', 'Food & Beverage', 'Maintenance', 'Safety', 'Other']
 
@@ -22,6 +26,10 @@ const CreateSOPPage = () => {
   const [videoDuration, setVideoDuration] = useState('—')
   const [status, setStatus] = useState('idle') // idle | uploading | creating | processing | ready | error
   const [error, setError] = useState('')
+  const [showRecorder, setShowRecorder] = useState(false)
+  const uploadInputRef = useRef(null)
+  const captureInputRef = useRef(null)
+  const recorder = useVideoRecorder()
 
   useEffect(() => {
     const title = searchParams.get('title')
@@ -63,6 +71,14 @@ const CreateSOPPage = () => {
   }, [videoFile])
 
   const isBusy = useMemo(() => status !== 'idle' && status !== 'ready' && status !== 'error', [status])
+  const canInteract = useMemo(() => !isBusy, [isBusy])
+
+  const formattedElapsed = useMemo(() => {
+    const totalSeconds = Math.floor((recorder.elapsedMs || 0) / 1000)
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }, [recorder.elapsedMs])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -74,8 +90,13 @@ const CreateSOPPage = () => {
     }
 
     try {
-      const requestId = searchParams.get('requestId')
-      if (!import.meta.env.VITE_AIRTABLE_API_KEY || !import.meta.env.VITE_AIRTABLE_BASE_ID) {
+      const sourceRequestId = searchParams.get('requestId')
+      const hasMake = Boolean(import.meta.env.VITE_MAKE_WEBHOOK_URL)
+      const hasCloudinary = Boolean(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME && import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET)
+
+      debugLog('Create SOP submit', { hasMake, hasCloudinary, taskName: taskName.trim(), category })
+
+      if (!hasMake || !hasCloudinary) {
         const next = loadDemoSops()
         const id = `rec-demo-${Date.now()}`
         const url = URL.createObjectURL(videoFile)
@@ -95,31 +116,58 @@ const CreateSOPPage = () => {
           },
           ...next,
         ])
-        if (requestId) updateDemoRequest(requestId, { status: 'done' })
+        if (sourceRequestId) updateDemoRequest(sourceRequestId, { status: 'done' })
         setStatus('ready')
         return
       }
 
       setStatus('uploading')
-      const attachment = await uploadAttachment(videoFile)
-      if (!attachment?.id) throw new Error('Could not upload video to Airtable.')
+      debugLog('Create SOP upload start', { name: videoFile.name, type: videoFile.type, bytes: videoFile.size })
+      const uploaded = await uploadMediaToCloudinary(videoFile)
+      if (!uploaded?.url) throw new Error('Could not upload video.')
 
       setStatus('creating')
-      const record = await createSOP({
-        taskName: taskName.trim(),
-        category,
-        attachmentId: attachment.id,
+      const response = await sendEventToMake({
+        actionType: ACTION_TYPES.SOP_CREATE,
+        payload: {
+          taskName: taskName.trim(),
+          category,
+          sourceRequestId: sourceRequestId || '',
+          video: {
+            provider: 'cloudinary',
+            url: uploaded.url,
+            publicId: uploaded.publicId,
+            durationSeconds: uploaded.durationSeconds,
+            mimeType: uploaded.mimeType,
+            originalFilename: uploaded.originalFilename,
+          },
+        },
+        meta: { source: 'web' },
       })
 
-      await ensureQrLinkOnRecord(record.id, record.qrLink)
+      const makeSopId = response?.data?.sopId || response?.data?.recordId || response?.data?.sop?.id || ''
 
-      setStatus('processing')
-      await pollSOPForSteps(record.id, { interval: 5000, timeout: 240000 })
+      const next = loadDemoSops()
+      const id = makeSopId || `rec-demo-${Date.now()}`
+      saveDemoSops([
+        {
+          id,
+          taskName: taskName.trim(),
+          category,
+          duration: videoDuration,
+          poster: '/sop-posters/default.svg',
+          video: { url: uploaded.url },
+          steps: { en: '', it: '', es: '' },
+        },
+        ...next,
+      ])
 
-      if (requestId) updateDemoRequest(requestId, { status: 'done' })
+      if (sourceRequestId) updateDemoRequest(sourceRequestId, { status: 'done' })
       setStatus('ready')
     } catch (err) {
-      setError(err.message || 'Unable to create SOP right now.')
+      const message = err?.message || 'Unable to create SOP right now.'
+      debugWarn('Create SOP failed', err)
+      setError(message)
       setStatus('error')
     }
   }
@@ -170,19 +218,151 @@ const CreateSOPPage = () => {
         <div className="space-y-1.5">
           <label className="text-base font-semibold text-slate-900 dark:text-slate-200">Video upload</label>
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-base text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!canInteract}
+                  onClick={() => uploadInputRef.current?.click()}
+                  className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-sky-500 dark:text-slate-950"
+                >
+                  Choose file
+                </button>
+                <button
+                  type="button"
+                  disabled={!canInteract}
+                  onClick={async () => {
+                    if (recorder.supported) {
+                      setShowRecorder(true)
+                      const result = await recorder.start()
+                      if (!result.ok) setShowRecorder(true)
+                      return
+                    }
+                    captureInputRef.current?.click()
+                  }}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  Record video
+                </button>
+                {videoFile ? (
+                  <button
+                    type="button"
+                    disabled={!canInteract}
+                    onClick={() => setVideoFile(null)}
+                    className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              {videoFile ? (
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {videoFile.name}
+                </span>
+              ) : null}
+            </div>
+
             <input
+              ref={uploadInputRef}
               type="file"
               accept="video/*"
               onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-              className="w-full text-base file:mr-4 file:rounded-full file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white dark:file:bg-sky-500 dark:file:text-slate-950"
+              className="hidden"
             />
+
+            <input
+              ref={captureInputRef}
+              type="file"
+              accept="video/*"
+              capture="environment"
+              onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Upload from your phone or laptop. File is saved directly to Airtable.
+              Upload from your phone or laptop. File is saved to Cloudinary.
             </p>
             {videoFile ? (
               <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Duration: {videoDuration}
               </p>
+            ) : null}
+
+            {showRecorder ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                        recorder.isRecording ? 'bg-red-500' : 'bg-slate-400'
+                      }`}
+                    />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      {recorder.isRecording ? `Recording… ${formattedElapsed}` : 'Recorder'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {recorder.isRecording ? (
+                      <button
+                        type="button"
+                        disabled={!canInteract}
+                        onClick={async () => {
+                          const result = await recorder.stop()
+                          if (result.ok && result.file) {
+                            setVideoFile(result.file)
+                            setShowRecorder(false)
+                          }
+                        }}
+                        className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        Stop
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!canInteract}
+                        onClick={async () => {
+                          const result = await recorder.start()
+                          if (!result.ok) setShowRecorder(true)
+                        }}
+                        className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-sky-500 dark:text-slate-950"
+                      >
+                        Start
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!canInteract}
+                      onClick={() => {
+                        recorder.cancel()
+                        setShowRecorder(false)
+                      }}
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+                {recorder.permissionError ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+                    {recorder.permissionError}
+                  </div>
+                ) : null}
+                {recorder.stream ? (
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-black dark:border-slate-700">
+                    <video
+                      autoPlay
+                      playsInline
+                      muted
+                      ref={(node) => {
+                        if (!node) return
+                        if (node.srcObject !== recorder.stream) node.srcObject = recorder.stream
+                      }}
+                      className="aspect-video w-full"
+                    />
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>

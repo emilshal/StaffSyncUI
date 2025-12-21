@@ -6,6 +6,10 @@ import VideoThumbnail from '../../components/shared/VideoThumbnail'
 import { loadDemoSops, subscribeDemoSops } from '../../lib/demoStore'
 import { addDemoRequest } from '../../lib/demoRequestsStore'
 import { createProblemReport, uploadAttachment } from '../../lib/airtable'
+import { ACTION_TYPES } from '../../lib/events/eventContract'
+import { sendEventToMake } from '../../lib/api/makeWebhook'
+import { uploadMediaToCloudinary } from '../../lib/uploads/cloudinary'
+import { debugLog, debugWarn } from '../../lib/debug'
 
 const StaffHome = () => {
   const [sops, setSops] = useState(loadDemoSops)
@@ -167,7 +171,37 @@ const StaffHome = () => {
         onSubmit={async ({ note, category, locationName, media, reset }) => {
           setSubmittingProblem(true)
           try {
-            if (import.meta.env.VITE_AIRTABLE_API_KEY && import.meta.env.VITE_AIRTABLE_BASE_ID) {
+            const hasMake = Boolean(import.meta.env.VITE_MAKE_WEBHOOK_URL)
+            const hasCloudinary = Boolean(
+              import.meta.env.VITE_CLOUDINARY_CLOUD_NAME && import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
+            )
+            const hasAirtable = Boolean(import.meta.env.VITE_AIRTABLE_API_KEY && import.meta.env.VITE_AIRTABLE_BASE_ID)
+
+            debugLog('Problem report submit', {
+              hasMake,
+              hasCloudinary,
+              hasAirtable,
+              category,
+              hasMedia: Boolean(media),
+            })
+
+            if (hasMake) {
+              const uploadedMedia = media && hasCloudinary ? await uploadMediaToCloudinary(media) : null
+
+              await sendEventToMake({
+                actionType: ACTION_TYPES.PROBLEM_REPORT,
+                payload: {
+                  message: note?.trim() ? note.trim() : '',
+                  category: category || '',
+                  locationName: locationName || '',
+                  mediaUrl: uploadedMedia?.url || '',
+                  mediaPublicId: uploadedMedia?.publicId || '',
+                  mediaMimeType: uploadedMedia?.mimeType || '',
+                  mediaOriginalFilename: uploadedMedia?.originalFilename || (media?.name || ''),
+                },
+                meta: { source: 'web' },
+              })
+            } else if (hasAirtable) {
               const attachment = media ? await uploadAttachment(media) : null
               await createProblemReport({
                 mediaAttachmentId: attachment?.id || '',
@@ -190,8 +224,9 @@ const StaffHome = () => {
             setShowProblemModal(false)
             setToast('Report sent')
             setTimeout(() => setToast(''), 2500)
-          } catch {
-            setToast('Could not send report')
+          } catch (err) {
+            debugWarn('Problem report failed', err)
+            setToast(err?.message || 'Could not send report')
             setTimeout(() => setToast(''), 2500)
           } finally {
             setSubmittingProblem(false)

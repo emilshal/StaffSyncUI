@@ -82,7 +82,7 @@ const ProblemReportModal = ({ open, onClose, onSubmit, submitting }) => {
                 onChange={(e) => setMedia(e.target.files?.[0] || null)}
                 className="w-full text-base file:mr-4 file:rounded-full file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white dark:file:bg-sky-500 dark:file:text-slate-950"
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400">Uploads go directly to the problem_reports table.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Uploads go to Cloudinary.</p>
             </div>
           </div>
 

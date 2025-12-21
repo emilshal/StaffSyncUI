@@ -9,6 +9,7 @@ import Roster from './pages/admin/Roster'
 import Login from './pages/auth/Login'
 import { clearDemoSession, loadDemoSession, subscribeDemoSession } from './lib/demoSessionStore'
 import { loadDemoUsers, subscribeDemoUsers } from './lib/demoUsersStore'
+import { debugInit } from './lib/debug'
 
 const Shell = ({ children, theme, setTheme }) => (
   <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50 flex flex-col transition-colors">
@@ -42,6 +43,10 @@ function App() {
   const [theme, setTheme] = useState(getInitialTheme)
   const [users, setUsers] = useState(loadDemoUsers)
   const [session, setSession] = useState(loadDemoSession)
+
+  useEffect(() => {
+    debugInit()
+  }, [])
 
   useEffect(() => {
     const root = document.documentElement
